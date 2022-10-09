@@ -9,46 +9,59 @@ function App() {
     provider: null,
     web3: null,
     contract: null,
+    isProviderLoaded: false,
   });
 
   const [account, setAccount] = useState(null);
   const [balance, setBalance] = useState(null);
   const [shouldReloadEffect, setShouldReloadEffect] = useState(false);
 
+  const canConnectToContract = account && web3Api.contract;
+
   const reloadEffect = useCallback(
     () => setShouldReloadEffect(!shouldReloadEffect),
     [shouldReloadEffect]
   );
 
-  const setAccountListener = useCallback(
-    async (provider) => {
-      provider.on("accountsChanged", (accounts) => {
-        setAccount(accounts[0]);
-        reloadEffect();
-      });
-    },
-    [reloadEffect]
-  );
+  const setAccountListener = useCallback(async (provider) => {
+    provider.on("accountsChanged", (_) => {
+      window.location.reload();
+    });
+
+    provider.on("chainChanged", (_) => {
+      window.location.reload();
+    });
+
+    // provider._jsonRpcConnection.events.on("notification", (payload) => {
+    //   const { method } = payload;
+    //   if (method === "metamask_unlockStateChanged") {
+    //     setAccount(null);
+    //   }
+    // });
+  }, []);
 
   useEffect(() => {
     const loadProvider = async () => {
       const provider = await detectEthereumProvider();
-      const contract = await loadContract("Faucet", provider);
 
       if (provider) {
+        const contract = await loadContract("Faucet", provider);
+
         setWeb3Api({
           web3: new Web3(provider),
           provider,
           contract,
+          isProviderLoaded: true,
         });
         setAccountListener(provider);
       } else {
+        setWeb3Api((prev) => ({ ...prev, isProviderLoaded: true }));
         console.error("Please, install Metamask.");
       }
     };
 
     loadProvider();
-  }, []);
+  }, [setAccountListener]);
 
   useEffect(() => {
     const loadBalance = async () => {
@@ -97,29 +110,53 @@ function App() {
     <>
       <div className='faucet-wrapper'>
         <div className='faucet'>
-          <div className='is-flex is-align-items-center'>
-            <span>
-              <strong className='mr-2'>Account: </strong>
-            </span>
-            {account ? (
-              <div>{account}</div>
-            ) : (
-              <button
-                className='button is-small'
-                onClick={() =>
-                  web3Api.provider.request({ method: "eth_requestAccounts" })
-                }>
-                Connect Wallet
-              </button>
-            )}
-          </div>
+          {web3Api.isProviderLoaded ? (
+            <div className='is-flex is-align-items-center'>
+              <span>
+                <strong className='mr-2'>Account: </strong>
+              </span>
+              {account ? (
+                <div>{account}</div>
+              ) : !web3Api.provider ? (
+                <div className='notification is-warning is-small is-rounded'>
+                  Wallet Not Detected.{"  "}
+                  <a
+                    target='_blank'
+                    href='https://docs.metamask.io'
+                    rel='noreferrer'>
+                    Install Metamask
+                  </a>{" "}
+                </div>
+              ) : (
+                <button
+                  className='button is-small'
+                  onClick={() =>
+                    web3Api.provider.request({ method: "eth_requestAccounts" })
+                  }>
+                  Connect Wallet
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className=''>Looking for web3...</div>
+          )}
           <div className='balance-view is-size-2 my-4'>
             Current Balance: <strong>{balance}</strong> ETH
           </div>
-          <button onClick={addFunds} className='button is-large is-primary'>
+          {!canConnectToContract && (
+            <div>Please, connect to Ganache network</div>
+          )}
+
+          <button
+            disabled={!canConnectToContract}
+            onClick={addFunds}
+            className='button is-large is-primary'>
             Donate 1eth
           </button>
-          <button onClick={withdraw} className='button is-large '>
+          <button
+            disabled={!canConnectToContract}
+            onClick={withdraw}
+            className='button is-large '>
             Withdraw 0.1eth
           </button>
         </div>
