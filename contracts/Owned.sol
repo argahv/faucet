@@ -9,11 +9,7 @@ contract Owned {
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function.");
+        require(msg.sender == owner, "Only owner can call this function");
         _;
-    }
-
-    function transferOwnership(address newOwner) public onlyOwner {
-        owner = newOwner;
     }
 }
